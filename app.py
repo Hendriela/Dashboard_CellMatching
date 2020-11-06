@@ -12,7 +12,7 @@ import numpy as np
 import json
 import internal_functions as int_func
 
-UPLOAD_DIRECTORY = "C:\\Users\\annahs\\Documents\\Footprints\\alignment_session_data\\"
+UPLOAD_DIRECTORY = "W:\\Neurophysiology-Storage1\\Wahl\\Anna\\"
 
 app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 
@@ -31,9 +31,11 @@ def format_fig(matrix, title="No session uploaded", zoom=False, center_coords_x=
         [0.1444444444444444, '#fdca26'],
         [0.1777777777777777, '#f0f921'],
         [0.25, "white"], [0.4, "white"], [0.4, "grey"],[0.5, "grey"],
-        [0.5, "red"], [0.6, "red"], [0.6, "green"], [0.7, "green"], [0.7, "purple"],[0.8, "purple"], [0.8, "black"],[1, "black"]], range_color=[0,5])
+        [0.5, "red"], [0.6, "red"], [0.6, "green"], [0.7, "green"], [0.7, "pink"],[0.8, "pink"], [0.8, "black"],[1, "black"]], range_color=[0,5])
     if is_tiff_mode:
-        fig=px.imshow(matrix)
+        matrix = np.interp(matrix, (matrix.min(), matrix.max()), (0, 1))
+        fig = px.imshow(matrix, zmin=0, zmax=1)
+        #fig=px.imshow(matrix, color_continuous_scale='gray', zmin=matrix.min(), zmax=matrix.max())
         fig.add_trace(go.Scatter(x=[center_coords_x], y=[center_coords_y], marker=dict(color='red', size=5)))
     #fig_neuron = px.imshow(footprints_1[0])
     fig.update_layout(#coloraxis_showscale=False,
@@ -55,6 +57,8 @@ def format_fig(matrix, title="No session uploaded", zoom=False, center_coords_x=
         fig.update_yaxes(range=[ymin, ymax], autorange=False)
     return fig
 
+# colour vars
+cols = [1.5, 2.2, 2.8, 3.2, 3.8, 4.5]
 
 
 empty_template = [[0]*512]*512
@@ -68,8 +72,7 @@ templates_tiff = [None] * 6
 coms = [None]*6
 print("here again")
 pixel_ownerships = [np.full((512, 512), -1)]*6
-cell_matching_df = pd.read_csv(UPLOAD_DIRECTORY + "cell2index.csv",  sep=';') #pd.DataFrame([])
-cell_matching_df = pd.read_csv(UPLOAD_DIRECTORY + "cell2index_empty.csv",  sep=';') #pd.DataFrame([])
+cell_matching_df = []
 
 filenames = [''] * 6
 current_selected = [-1]*6
@@ -297,7 +300,7 @@ def update_graph(tiff_mode, filename, graph_idx, curr_neuron):
     if curr_neuron == -1:
         new_graph = format_fig( background, title=filename.partition(".")[0], zoom=False, is_tiff_mode=tiff_mode)
     else:
-        new_graph_matrix = np.where(footprints[graph_idx][curr_neuron] >= 0.01, background + 0.5, background)
+        new_graph_matrix = np.where(footprints[graph_idx][curr_neuron] >= 0.01, cols[0], background)
         new_graph = format_fig(new_graph_matrix, title=filename.partition(".")[0], zoom=True,
                                         center_coords_x=int(coms[graph_idx][curr_neuron][1]),
                                         center_coords_y=int(coms[graph_idx][curr_neuron][0]),
@@ -328,17 +331,18 @@ def update_graph(tiff_mode, filename, graph_idx, curr_neuron):
      Input('graph_4', 'clickData'),
      Input('graph_5', 'clickData'),
      Input('save_button', 'n_clicks'),
-     Input('suggestion_mode_button',  'active'),
-     Input('tiff_mode_button',  'active')],
+     Input('suggestion_mode_button', 'active'),
+     Input('tiff_mode_button', 'active')],
     [State('graph_0', 'figure'),
        State('graph_1', 'figure'),
        State('graph_2', 'figure'),
        State('graph_3', 'figure'),
        State('graph_4', 'figure'),
        State('graph_5', 'figure'),
-       State('num_left_to_match', 'children'),],prevent_initial_call=True)
+       State('num_left_to_match', 'children')]
+     , prevent_initial_call=True)
 def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, click_save, suggestion_mode, tiff_mode,
-                  st0, st1, st2, st3, st4, st5, state_cells_left):
+                  st0, st1, st2, st3, st4, st5, state_cells_left ):
     fnames = [fn0, fn1, fn2, fn3, fn4, fn5]
     cdata = [cd0, cd1, cd2, cd3, cd4, cd5]
     states = [st0, st1, st2, st3, st4, st5]
@@ -346,12 +350,11 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, cl
     new_sugg = False
     cells_left_message = state_cells_left
     ctx = dash.callback_context
-    print(ctx)
     global cell_matching_df
     global templates; global orig_templates
+
     if ctx.triggered:
         global current_selected
-        print(ctx.triggered)
         trigger_action = ctx.triggered[0]['prop_id'].split('.')[1]
         trigger_firstarg = ctx.triggered[0]['prop_id'].split('.')[0]
 
@@ -380,7 +383,6 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, cl
                 # output number of cells left to match
                 num_cells_left =  sum(cell_matching_df["confirmed"] == 0)
                 cells_left_message =  str(num_cells_left) + " cells left to confirm"
-                print("cells left ", cells_left_message)
                 # color neuron in graphs
                 color = cell_matching_df.at[row_idx, "color"]
                 for graph_idx, filename in enumerate(filenames):
@@ -389,9 +391,9 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, cl
                     if not filename or curr_neuron == -1:
                         continue
                     print(curr_neuron, color)
-                    templates[graph_idx] = np.where(footprints[graph_idx][curr_neuron] >= 0.01, color,templates[graph_idx])
-                    updates[graph_idx] = update_graph(tiff_mode, filename, graph_idx, curr_neuron)
-                print("cells left ", cells_left_message)
+                    templates[graph_idx] = np.where(footprints[graph_idx][curr_neuron] >= 0.01, cols[color], templates[graph_idx])
+                    updates[graph_idx] = update_graph(tiff_mode, filename, graph_idx, -1)
+                print(cells_left_message)
                 new_sugg = suggestion_mode
 
             
@@ -399,23 +401,24 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, cl
         if (ctx.triggered[0]['prop_id'] == "suggestion_mode_button.active") or new_sugg:
             if ctx.triggered[0]['value'] or new_sugg:
                 print("new neuron matching suggested")
-                col = cell_matching_df["confirmed"]
-                row_idx = cell_matching_df[col == 0].index.values[0]
-                for graph_idx, filename in enumerate(fnames):
-                    if not filename:
-                        continue
-                    print(filename, fnames)
-                    curr_neuron = cell_matching_df.iloc[row_idx][filename.partition(".")[0]]
-                    if isinstance(curr_neuron, list):
-                        print("list of tuples ", curr_neuron )
-                        curr_neuron = curr_neuron[0][1]
-                    print(curr_neuron); current_selected[graph_idx] = curr_neuron
-                    updates[graph_idx] = update_graph(tiff_mode, filename, graph_idx, curr_neuron)
-                    print(int(coms[graph_idx][curr_neuron][0]), int(coms[graph_idx][curr_neuron][1]))
+                if isinstance(cell_matching_df, pd.DataFrame):
+                    col = cell_matching_df["confirmed"]
+                    row_idx = cell_matching_df[col == 0].index.values[0]
+                    for graph_idx, filename in enumerate(fnames):
+                        if not filename:
+                            continue
+                        print(filename, fnames)
+                        curr_neuron = cell_matching_df.iloc[row_idx][filename.partition(".")[0]]
+                        if isinstance(curr_neuron, list):
+                            print("list of tuples ", curr_neuron )
+                            curr_neuron = curr_neuron[0][1]
+                        print(curr_neuron); current_selected[graph_idx] = curr_neuron
+                        updates[graph_idx] = update_graph(tiff_mode, filename, graph_idx, curr_neuron)
+                        print(int(coms[graph_idx][curr_neuron][0]), int(coms[graph_idx][curr_neuron][1]))
 
         #  IMAGE MODE CHANGED
         elif ctx.triggered[0]['prop_id'] == "tiff_mode_button.active":
-            print("***callback: IMAGE MODE CHANGED")
+            print("***callback: IMAGE MODE tiff CHANGED to: ", tiff_mode)
             for graph_idx, filename in enumerate(fnames):
                 if not filename:
                     continue
@@ -426,7 +429,7 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, cl
         # 2 GRAPH CLICKED
         elif trigger_action == "clickData":
             trigger_graph_id = int(trigger_firstarg[-1])
-            print("trigger_id: ", trigger_graph_id)
+            print("***callback: IMAGE CLICKED trigger_id: ", trigger_graph_id)
             clickData = cdata[trigger_graph_id]
             print(clickData)
             y = clickData['points'][0]['x']
@@ -439,7 +442,7 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, cl
 
                 # reselection of matching -> update highlighted neuron (of a non-reference graph)
                 if trigger_graph_id != 0:
-                    updates[trigger_graph_id] = update_graph(tiff_mode, fnames[trigger_graph_id], trigger_graph_id, curr_neuron)
+                    updates[trigger_graph_id] = update_graph(tiff_mode, fnames[trigger_graph_id], trigger_graph_id, current_selected[trigger_graph_id])
 
                 # new ref neuron clicked -> update highlighted neuron in ref and non-ref graphs
                 if trigger_graph_id == 0 and not suggestion_mode:
@@ -466,17 +469,17 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, cl
             print("click on nothing?")
         # 3 UPLOAD BUTTON
         elif trigger_action == 'filename':
+            print("***callback: LOAD FILE")
             trigger_graph_id = int(trigger_firstarg[-1])
-            print("load: ", fnames[trigger_graph_id])
+            print("loading ", fnames[trigger_graph_id])
             updates[trigger_graph_id] = format_fig(getdata_from_npyfile(fnames[trigger_graph_id], trigger_graph_id)[1],  title=fnames[trigger_graph_id].partition(".")[0])
-            print("done laoding file")
+            print("done loading file")
             for i in range(6):
                 if i != trigger_graph_id:
                     updates[i] = no_update
-            print("almost done")
         else:
             pass
-    print("cells left ", cells_left_message)
+    print(cells_left_message)
     return tuple(updates) + (cells_left_message,)
 
 
@@ -487,7 +490,7 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, cl
 def matching(n_clicks):
     if n_clicks is None:
         raise dash.exceptions.PreventUpdate
-    print("matching is being computed")
+    print("***callback: MATCHING COMPUTED")
     message = "upload npy_files first"
     if filenames[0]:
         #match_neurons_across_session()
@@ -507,7 +510,7 @@ def matching(n_clicks):
             #print(type([i for i in range(0, num_neurons_ref)]), len([i for i in range(0, num_neurons_ref)]),
             #      type(list(closest[0])), len(list(closest[0])))
 
-        matching_df["color"] = np.arange(len(matching_df)) % 4 + 1
+        matching_df["color"] = np.arange(len(matching_df)) % 5 + 1
         matching_df["confirmed"] = 0
         global cell_matching_df; cell_matching_df = matching_df
         message = "matching computed"
@@ -521,29 +524,29 @@ def matching(n_clicks):
 @app.callback(
     Output('upload_confirmation', 'children'),
     [Input('upload_csv_matching', 'filename')], prevent_initial_call=True)
-def yo(filename):
-    print(type(filename))
-    message = "no file uploaded"
-    if filename:
-        df = pd.read_csv(UPLOAD_DIRECTORY + filename, sep=';')
-        # check if column for each uploaded session in csv
-        loaded_filenames = [file for file in filenames if file]
-        print("loaded filenames: ", loaded_filenames, " df.columns ", df.columns)
-        all_sessions_in_csv = all(elem in df.columns for elem in loaded_filenames)
-        print("all_sessions_in_csv ", all_sessions_in_csv)
-        print(type(list(df.columns)), type(loaded_filenames))
-        print(df.columns[0])
-        has_correct_ref_session = list(df.columns) and loaded_filenames and loaded_filenames[0] == df.columns[0]
-        print("has_correct_ref_session ", has_correct_ref_session)
-        if not loaded_filenames:
-            message = "load sessions first!"
-        elif not all_sessions_in_csv:
-            message = "invalid csv (col per session!)"
-        elif not has_correct_ref_session:
-            message = "ref sess msut be first col in csv"
-        else:
-            global cell_matching_df; cell_matching_df = df
-            message = filename + " uploaded."
+def uploading_csv(filename):
+    if not filename:
+        raise dash.exceptions.PreventUpdate
+    print("***callback: MATCHING COMPUTED: ", dash.callback_context.triggered)
+    df = pd.read_csv(UPLOAD_DIRECTORY + filename, sep=';')
+    # check if column for each uploaded session in csv
+    loaded_filenames = [file for file in filenames if file]
+    print("loaded filenames: ", loaded_filenames, " df.columns ", df.columns)
+    all_sessions_in_csv = all(elem in df.columns for elem in loaded_filenames)
+    print("all_sessions_in_csv ", all_sessions_in_csv)
+    print(type(list(df.columns)), type(loaded_filenames))
+    print(df.columns[0])
+    has_correct_ref_session = list(df.columns) and loaded_filenames and loaded_filenames[0] == df.columns[0]
+    print("has_correct_ref_session ", has_correct_ref_session)
+    if not loaded_filenames:
+        message = "load sessions first!"
+    elif not all_sessions_in_csv:
+        message = "invalid csv (col per session!)"
+    elif not has_correct_ref_session:
+        message = "ref sess msut be first col in csv"
+    else:
+        global cell_matching_df; cell_matching_df = df
+        message = filename + " uploaded."
     return message
 
 
@@ -557,6 +560,9 @@ def yo(filename):
     [State('selection_mode_button',  'active'), State('suggestion_mode_button',  'active')],
     prevent_initial_call=True)
 def update_selection_mode(c_sel, c_sug, state_sel, state_sug):
+    if all(click is None for click in [c_sel, c_sug]):
+        raise dash.exceptions.PreventUpdate
+    print("***callback: UPDATE SELECTION MODE")
     states = [no_update]*2
     ctx = dash.callback_context
     if ctx.triggered:
@@ -573,13 +579,17 @@ def update_selection_mode(c_sel, c_sug, state_sel, state_sug):
     [Input('basic_mode_button',  'n_clicks'), Input('tiff_mode_button',  'n_clicks')],
     [State('basic_mode_button',  'active'), State('tiff_mode_button',  'active')],
     prevent_initial_call=True)
-def update_selection_mode(c_basic, c_tiff, state_basic, state_tiff):
+def update_image_mode(c_basic, c_tiff, state_basic, state_tiff):
+    if all(click is None for click in [c_basic, c_tiff]):
+        raise dash.exceptions.PreventUpdate
+    print("***callback: UPDATE IMAGE MODE")
     states = [no_update]*2
     ctx = dash.callback_context
     if ctx.triggered:
         if((ctx.triggered[0]['prop_id'] == "basic_mode_button.n_clicks" and not state_basic)
             or (ctx.triggered[0]['prop_id'] == "tiff_mode_button.n_clicks" and not state_tiff)):
             states = [not state_basic, not state_tiff]
+    print(states)
     return states
 
 ### no match buttons
@@ -593,10 +603,11 @@ def update_selection_mode(c_basic, c_tiff, state_basic, state_tiff):
      State('no_match_4', 'active'), State('no_match_5', 'active'), State('no_match_6', 'active')],
     prevent_initial_call=True)
 def update_no_match_buttons(click2, click3, click4, click5, click6, state2, state3, state4, state5, state6):
-    #print(args)
+    clicks = [click2, click3, click4, click5, click6]
+    if all(click is None for click in clicks) :
+        raise dash.exceptions.PreventUpdate
+    print("***callback: UPDATE MATCH BUTTONS: ", dash.callback_context.triggered)
     states = [state2, state3, state4, state5, state6]
-    print(states)
-    print("no_match_button clicked")
     ctx = dash.callback_context
     if ctx.triggered:
         print(ctx.triggered[0]["prop_id"].split(".")[0][-1])
