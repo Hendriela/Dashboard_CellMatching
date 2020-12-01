@@ -2,15 +2,19 @@ import numpy as np
 from scipy import ndimage, signal
 import plotly.express as px
 import pandas as pd
-#import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from skimage import measure, data, io, filters
 from scipy import ndimage, signal
-import  math
+import math
 import cv2 as cv
 from skimage.registration import phase_cross_correlation
 from operator import itemgetter
 from scipy.ndimage import zoom
-#from skimage.draw import line, polygon, circle, ellipse
+from scipy import spatial
+from skimage.draw import line, polygon, circle, ellipse
+
+offset = 10
+
 
 def pixel_neuron_ownership(footprint):
     """Assigns an ownershiop neuron to each "pixel" of a 2D (dim x dim). 
@@ -22,7 +26,7 @@ def pixel_neuron_ownership(footprint):
     """
     max_vals = np.amax(footprint, axis=0)
     pixel_owners = np.argmax(footprint, axis=0)
-    pixel_owners = np.where(max_vals>0.005,pixel_owners,-1)
+    pixel_owners = np.where(max_vals > 0.005, pixel_owners, -1)
     return pixel_owners
 
 
@@ -31,7 +35,6 @@ def compute_CoMs(footprints):
     for idx, footprint in enumerate(footprints):
         CoMs[idx] = ndimage.measurements.center_of_mass(footprint)
     return CoMs
-
 
 
 def piecewise_fov_shift(ref_img, tar_img, n_patch=8):
@@ -45,27 +48,33 @@ def piecewise_fov_shift(ref_img, tar_img, n_patch=8):
     :return: two np.arrays containing estimated shifts per pixel (upscaled x_shift_map, upscaled y_shift_map)
     """
     img_dim = ref_img.shape
-    patch_size = int(img_dim[0]/n_patch)
+    patch_size = int(img_dim[0] / n_patch)
 
     shift_map_x = np.zeros((n_patch, n_patch))
     shift_map_y = np.zeros((n_patch, n_patch))
     for row in range(n_patch):
         for col in range(n_patch):
-            curr_ref_patch = ref_img[row*patch_size:row*patch_size+patch_size, col*patch_size:col*patch_size+patch_size]
-            curr_tar_patch = tar_img[row*patch_size:row*patch_size+patch_size, col*patch_size:col*patch_size+patch_size]
-            patch_shift = phase_cross_correlation(curr_ref_patch, curr_tar_patch, upsample_factor=100, return_error=False)
+            curr_ref_patch = ref_img[row * patch_size:row * patch_size + patch_size,
+                             col * patch_size:col * patch_size + patch_size]
+            curr_tar_patch = tar_img[row * patch_size:row * patch_size + patch_size,
+                             col * patch_size:col * patch_size + patch_size]
+            patch_shift = phase_cross_correlation(curr_ref_patch, curr_tar_patch, upsample_factor=100,
+                                                  return_error=False)
             shift_map_x[row, col] = patch_shift[0]
             shift_map_y[row, col] = patch_shift[1]
     shift_map_x_big = zoom(shift_map_x, patch_size, order=3)
     shift_map_y_big = zoom(shift_map_y, patch_size, order=3)
     return shift_map_x_big, shift_map_y_big
 
+
 def format_footprints(session_npy_data):
     num_neurons = session_npy_data['dff_trace'].shape[0]
     footprints = np.reshape(session_npy_data['spatial_masks'].toarray(),
-                                      (session_npy_data['template'].shape[0],session_npy_data['template'].shape[1] ,num_neurons), order='F')
-    footprints = np.transpose(footprints, (2,0,1))
+                            (session_npy_data['template'].shape[0], session_npy_data['template'].shape[1], num_neurons),
+                            order='F')
+    footprints = np.transpose(footprints, (2, 0, 1))
     return footprints
+
 
 def compute_CoMs(footprints):
     CoMs = np.full(footprints.shape[0], np.nan, dtype='f,f')
@@ -73,33 +82,40 @@ def compute_CoMs(footprints):
         CoMs[idx] = ndimage.measurements.center_of_mass(footprint)
     return CoMs
 
+
 def get_neuron_crop(footprint):
     coords_non0 = np.argwhere(footprint)
-    x_min, y_min = coords_non0.min(axis=0); x_max, y_max = coords_non0.max(axis=0)
-    #x_length_neuron_crop = x_max - x_min; y_length_neuron_crop = y_max - y_min
-    cropped = footprint[x_min:x_max+1, y_min:y_max+1]
+    x_min, y_min = coords_non0.min(axis=0);
+    x_max, y_max = coords_non0.max(axis=0)
+    # x_length_neuron_crop = x_max - x_min; y_length_neuron_crop = y_max - y_min
+    cropped = footprint[x_min:x_max + 1, y_min:y_max + 1]
     return cropped
 
+
 def get_area_crop(template, CoM, margin=50):
-    ymin= max(0,int(CoM[1]-margin)); ymax= min(template.shape[1],int(CoM[1]+margin));
-    xmin= max(0,int(CoM[0]-margin)); xmax= min(template.shape[0],int(CoM[0]+margin));
+    ymin = max(0, int(CoM[1] - margin));
+    ymax = min(template.shape[1], int(CoM[1] + margin));
+    xmin = max(0, int(CoM[0] - margin));
+    xmax = min(template.shape[0], int(CoM[0] + margin));
     print(CoM[0], CoM[1], template.shape[0], template.shape[1], xmin, xmax, ymin, ymax)
     cropped = template[xmin:xmax, ymin:ymax]
-    print(template.shape[0]-ymax,template.shape[0]-ymin,
-                        template.shape[1]-xmax,template.shape[0]-xmin)
-    return cropped, (CoM[1]-ymin, CoM[0]-xmin) #(CoM[1]-template.shape[0]+ymax, CoM[0]-template.shape[1]+xmax)
+    print(template.shape[0] - ymax, template.shape[0] - ymin,
+          template.shape[1] - xmax, template.shape[0] - xmin)
+    return cropped, (CoM[1] - ymin, CoM[0] - xmin)  # (CoM[1]-template.shape[0]+ymax, CoM[0]-template.shape[1]+xmax)
+
 
 def binarize_contour_area(footprint):
-    contours = measure.find_contours(footprint, 0.05,  fully_connected='high')
+    contours = measure.find_contours(footprint, 0.05, fully_connected='high')
     # if no contour binarize footprint
-    new_footprint =  np.copy(footprint)
+    new_footprint = np.copy(footprint)
     if contours:
-        rr, cc = polygon(contours[0][:,0], contours[0][:,1], footprint.shape)
-        new_footprint [rr,cc] = 255
+        rr, cc = polygon(contours[0][:, 0], contours[0][:, 1], footprint.shape)
+        new_footprint[rr, cc] = 255
     else:
         print("no contour")
-        new_footprint  = np.where(footprint>0.07, 1.0, 0.0)
-    return  new_footprint
+        new_footprint = np.where(footprint > 0.07, 1.0, 0.0)
+    return new_footprint
+
 
 def shift_CoMs(CoMs, shift, dims):
     """
@@ -114,7 +130,7 @@ def shift_CoMs(CoMs, shift, dims):
     coms_shifted = np.full(CoMs.shape[0], np.nan, dtype='f,f')
     for idx, com in enumerate(CoMs):
         com_shift = [com[0] - shift[0][int(com[0])][int(com[1])], com[1] - shift[1][int(com[0])][int(com[1])]]
-        #print(com, shift[idx], com_shift)
+        # print(com, shift[idx], com_shift)
         # cap CoM at 0 and dims limits
         com_shift = [0 if x < 0 else x for x in com_shift]
         for coord in range(len(com_shift)):
@@ -123,43 +139,76 @@ def shift_CoMs(CoMs, shift, dims):
         coms_shifted[idx] = tuple(com_shift)
     return coms_shifted
 
+def getclosest_neighbour(coms, ref_neuron_idx):
 
-def match_neurons_to_ref_old(footprints_ref, footprints_other,
-                                 coms_ref, coms_other,
-                                 template_ref, template_other):
-    num_neurons_ref = coms_ref.shape[0]; num_neurons_other = coms_other.shape[0]
-    fov_shift = piecewise_fov_shift(template_ref, template_other)
-    coms_shifted_other = shift_CoMs(coms_other, fov_shift, template_other.shape)
-    dist_matrix = np.zeros((num_neurons_ref, num_neurons_other))
-    for neuron_idx_ref in range(num_neurons_ref):
-        com_ref = coms_ref[neuron_idx_ref]
-        for neuron_idx_other in range(num_neurons_other):
-            com_other = coms_other[neuron_idx_other]
-            footprint_other = footprints_other[neuron_idx_other];
-            #print(com_ref[0], com_ref[1], com_other[0], com_other[1])
-            dist_matrix[neuron_idx_ref][neuron_idx_other] = math.sqrt((com_ref[0]-com_other[0])**2 + (com_ref[1]-com_other[1])**2)
-    print(type(np.argmin(dist_matrix, axis=1)))
-    return np.argmin(dist_matrix, axis=1)
+    distance,index = spatial.KDTree(coms).query(ref_neuron_idx, k=2)
+    print(distance, index)
+
+
+# compare feature tuples!
+class Comp(object):
+    def __init__(self, tup):
+        self.tup = tup
+
+    def __lt__(self, other):
+        # If the difference is less or equal the offset of the second item compare the third
+        if abs(self.tup[1] - other.tup[1]) <= offset:
+            # The lower the result of cv.matchShape, the better the match is.
+            return self.tup[2] < other.tup[2]
+        # otherwise compare them as usual
+        else:
+            return self.tup[1] < other.tup[1]
 
 
 def match_neurons_to_ref(footprints_ref, footprints_other,
-                                 coms_ref, coms_other,
-                                 template_ref, template_other):
-    num_neurons_ref = coms_ref.shape[0]; num_neurons_other = coms_other.shape[0]
+                         coms_ref, coms_other,
+                         template_ref, template_other):
+    num_neurons_ref = coms_ref.shape[0]
+    num_neurons_other = coms_other.shape[0]
     fov_shift = piecewise_fov_shift(template_ref, template_other)
     coms_shifted_other = shift_CoMs(coms_other, fov_shift, template_other.shape)
-    matching_ranked =  [None]*num_neurons_ref
+    matching_ranked = [None] * num_neurons_ref
+    matching_with_feature_info = [None] * num_neurons_ref
+    for neuron_idx_ref in range(num_neurons_ref):
+        com_ref = coms_ref[neuron_idx_ref]
+        cropped_image_ref_bin = binarize_contour_area(get_neuron_crop(footprints_ref[neuron_idx_ref]))
+        curr_matches = []
+        for neuron_idx_other in range(num_neurons_other):
+            com_other = coms_other[neuron_idx_other]
+            cropped_image_other_bin = binarize_contour_area(get_neuron_crop(footprints_other[neuron_idx_other]))
+            similarity_neuroncrop_score = cv.matchShapes(cropped_image_other_bin, cropped_image_ref_bin, 1, 0.0)
+            # print(com_ref[0], com_ref[1], com_other[0], com_other[1])
+            dist = math.sqrt((com_ref[0] - com_other[0]) ** 2 + (com_ref[1] - com_other[1]) ** 2)
+            curr_matches.append((neuron_idx_other, dist, similarity_neuroncrop_score))
+        sorted_matches = sorted(curr_matches, key=Comp)
+        # print(sorted_matches)
+        matching_ranked[neuron_idx_ref] = [match_tuples[0] for match_tuples in sorted_matches]
+        matching_with_feature_info[neuron_idx_ref] = sorted_matches
+        print(neuron_idx_other, neuron_idx_ref, num_neurons_other, num_neurons_ref)
+    print(len(matching_ranked))
+    return matching_ranked, matching_with_feature_info
+
+
+def match_neurons_to_ref_old(footprints_ref, footprints_other,
+                             coms_ref, coms_other,
+                             template_ref, template_other):
+    num_neurons_ref = coms_ref.shape[0];
+    num_neurons_other = coms_other.shape[0]
+    fov_shift = piecewise_fov_shift(template_ref, template_other)
+    coms_shifted_other = shift_CoMs(coms_other, fov_shift, template_other.shape)
+    matching_ranked = [None] * num_neurons_ref
     for neuron_idx_ref in range(num_neurons_ref):
         com_ref = coms_ref[neuron_idx_ref]
         curr_matches = []
         for neuron_idx_other in range(num_neurons_other):
             com_other = coms_other[neuron_idx_other]
             footprint_other = footprints_other[neuron_idx_other];
-            #print(com_ref[0], com_ref[1], com_other[0], com_other[1])
-            dist = math.sqrt((com_ref[0]-com_other[0])**2 + (com_ref[1]-com_other[1])**2)
+            # print(com_ref[0], com_ref[1], com_other[0], com_other[1])
+            dist = math.sqrt((com_ref[0] - com_other[0]) ** 2 + (com_ref[1] - com_other[1]) ** 2)
             curr_matches.append((neuron_idx_other, dist))
         curr_matches.sort(key=itemgetter(1))
         matching_ranked[neuron_idx_ref] = [match_tuples[0] for match_tuples in curr_matches]
+    print(len(matching_ranked))
     return matching_ranked
 
 

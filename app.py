@@ -12,7 +12,8 @@ import numpy as np
 import json
 import internal_functions as int_func
 
-UPLOAD_DIRECTORY = "W:\\Neurophysiology-Storage1\\Wahl\\Anna\\"
+# UPLOAD_DIRECTORY = "W:\\Neurophysiology-Storage1\\Wahl\\Anna\\"
+UPLOAD_DIRECTORY = "/home/anna/Documents/Neuron_imaging_validationsets/"
 
 app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 
@@ -35,9 +36,9 @@ def format_fig(matrix, title="No session uploaded", zoom=False, center_coords_x=
     if is_tiff_mode:
         matrix = np.interp(matrix, (matrix.min(), matrix.max()), (0, 1))
         fig = px.imshow(matrix, zmin=0, zmax=1)
-        #fig=px.imshow(matrix, color_continuous_scale='gray', zmin=matrix.min(), zmax=matrix.max())
+        # fig=px.imshow(matrix, color_continuous_scale='gray', zmin=matrix.min(), zmax=matrix.max())
         fig.add_trace(go.Scatter(x=[center_coords_x], y=[center_coords_y], marker=dict(color='red', size=5)))
-    #fig_neuron = px.imshow(footprints_1[0])
+    # fig_neuron = px.imshow(footprints_1[0])
     fig.update_layout(#coloraxis_showscale=False,
                     autosize=False,
                     width=350, height=350,
@@ -278,6 +279,7 @@ def getdata_from_npyfile(filename, graph_id):
     session_data = np.load(UPLOAD_DIRECTORY + filename, allow_pickle=True).item()
     templates[graph_id] = session_data['template']
     orig_templates[graph_id] = session_data['template']
+
     print("basic template loaded")
     templates_tiff[graph_id] = session_data['mean_intensity_template']
     print("templates loaded")
@@ -290,6 +292,10 @@ def getdata_from_npyfile(filename, graph_id):
     print("transposed footprints")
     pixel_ownerships[graph_id] = int_func.pixel_neuron_ownership(footprints[graph_id])
     coms[graph_id] = int_func.compute_CoMs(footprints[graph_id])
+    # update template
+    for com in coms[graph_id]:
+        templates[graph_id][int(com[0])][int(com[1])]= 255
+
     filenames[graph_id] = filename.partition(".")[0]
     print(type(templates), type(footprints), type(pixel_ownerships))
     return orig_templates[graph_id], templates[graph_id], footprints[graph_id], pixel_ownerships[graph_id]
@@ -300,7 +306,8 @@ def update_graph(tiff_mode, filename, graph_idx, curr_neuron):
     if curr_neuron == -1:
         new_graph = format_fig( background, title=filename.partition(".")[0], zoom=False, is_tiff_mode=tiff_mode)
     else:
-        new_graph_matrix = np.where(footprints[graph_idx][curr_neuron] >= 0.01, cols[0], background)
+        new_graph_matrix = np.where(np.logical_and(footprints[graph_idx][curr_neuron] >= 0.01, background != 255), # to keep com dot
+                                    cols[0], background)
         new_graph = format_fig(new_graph_matrix, title=filename.partition(".")[0], zoom=True,
                                         center_coords_x=int(coms[graph_idx][curr_neuron][1]),
                                         center_coords_y=int(coms[graph_idx][curr_neuron][0]),
@@ -339,10 +346,10 @@ def update_graph(tiff_mode, filename, graph_idx, curr_neuron):
        State('graph_3', 'figure'),
        State('graph_4', 'figure'),
        State('graph_5', 'figure'),
-       State('num_left_to_match', 'children')]
-     , prevent_initial_call=True)
+       State('num_left_to_match', 'children')],
+       prevent_initial_call=True)
 def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, click_save, suggestion_mode, tiff_mode,
-                  st0, st1, st2, st3, st4, st5, state_cells_left ):
+                  st0, st1, st2, st3, st4, st5, state_cells_left):
     fnames = [fn0, fn1, fn2, fn3, fn4, fn5]
     cdata = [cd0, cd1, cd2, cd3, cd4, cd5]
     states = [st0, st1, st2, st3, st4, st5]
@@ -360,6 +367,7 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, cl
 
         # 1. SAVE BUTTON CLICKED
         if trigger_action == "n_clicks" and trigger_firstarg == "save_button":
+            print("***callback: SAVE")
             if not filenames[0] :    # no files uploaded and/or nothing highlighted
                 cells_left_message = "upload files first"
             else:
@@ -372,12 +380,13 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, cl
                         cell_matching_df.at[row_idx, filename] = current_selected[graph_idx]
                         if graph_idx: # not ref graph
                             confirmed_neurons = list(cell_matching_df.loc[cell_matching_df['confirmed'] == 1][filename])
+                            print("confirmed_neurons: ", confirmed_neurons)
                             for i in cell_matching_df.index:
                                 if cell_matching_df.at[i, "confirmed"] == 0:
-                                    allowed_ranking = [neur for neur in cell_matching_df.at[i, filename + "ranking"]
-                                                       if neur not in confirmed_neurons]
-                                    cell_matching_df.at[i, filename] =  allowed_ranking[0] if allowed_ranking else 0
-                cell_matching_df.to_csv(UPLOAD_DIRECTORY + "result.csv", index = False, header=True, sep=';')
+                                    allowed_ranking = [neuron for neuron in json.loads(cell_matching_df.at[i, filename + "ranking"])
+                                                       if neuron not in confirmed_neurons]
+                                    cell_matching_df.at[i, filename] = allowed_ranking[0] if allowed_ranking else 0
+                cell_matching_df.to_csv(UPLOAD_DIRECTORY + "result.csv", index=False, header=True, sep=';')
                 print("csv saved @ ", UPLOAD_DIRECTORY + "result.csv")
 
                 # output number of cells left to match
@@ -391,7 +400,8 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, cl
                     if not filename or curr_neuron == -1:
                         continue
                     print(curr_neuron, color)
-                    templates[graph_idx] = np.where(footprints[graph_idx][curr_neuron] >= 0.01, cols[color], templates[graph_idx])
+                    templates[graph_idx] = np.where(np.logical_and(footprints[graph_idx][curr_neuron] >= 0.01, templates[graph_idx] != 255),
+                                                cols[color], templates[graph_idx])
                     updates[graph_idx] = update_graph(tiff_mode, filename, graph_idx, -1)
                 print(cells_left_message)
                 new_sugg = suggestion_mode
@@ -409,6 +419,10 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, cl
                             continue
                         print(filename, fnames)
                         curr_neuron = cell_matching_df.iloc[row_idx][filename.partition(".")[0]]
+                        if trigger_graph_id != graph_idx:
+                            curr_neuron_features = cell_matching_df.iloc[row_idx][filename.partition(".")[0] +  "feature_vals"]
+                            print(curr_neuron_features)
+                        #print(curr_neuron_features[0], curr_neuron_features[1], curr_neuron_features[2])
                         if isinstance(curr_neuron, list):
                             print("list of tuples ", curr_neuron )
                             curr_neuron = curr_neuron[0][1]
@@ -430,10 +444,10 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, cl
         elif trigger_action == "clickData":
             trigger_graph_id = int(trigger_firstarg[-1])
             print("***callback: IMAGE CLICKED trigger_id: ", trigger_graph_id)
-            clickData = cdata[trigger_graph_id]
-            print(clickData)
-            y = clickData['points'][0]['x']
-            x = clickData['points'][0]['y']
+            click_data = cdata[trigger_graph_id]
+            print(click_data)
+            y = click_data['points'][0]['x']
+            x = click_data['points'][0]['y']
             print("click on something",  x,y, fnames[trigger_graph_id], np.amax(pixel_ownerships[trigger_graph_id]))
             neuron_id = pixel_ownerships[trigger_graph_id][x,y]
             print("clicked on neuron: ", neuron_id, "trigger graph: ", trigger_graph_id)
@@ -442,6 +456,7 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, cl
 
                 # reselection of matching -> update highlighted neuron (of a non-reference graph)
                 if trigger_graph_id != 0:
+                    print("newly selected: ", current_selected[trigger_graph_id])
                     updates[trigger_graph_id] = update_graph(tiff_mode, fnames[trigger_graph_id], trigger_graph_id, current_selected[trigger_graph_id])
 
                 # new ref neuron clicked -> update highlighted neuron in ref and non-ref graphs
@@ -459,6 +474,10 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, cl
                             continue
                         print(filename, fnames)
                         curr_neuron = cell_matching_df.iloc[idx][filename.partition(".")[0]]
+                        if trigger_graph_id != graph_idx:
+                            curr_neuron_features = cell_matching_df.iloc[idx][filename.partition(".")[0] +  "feature_vals"]
+                            print(curr_neuron_features)
+                        #print("top 3:" , curr_neuron_features[0], curr_neuron_features[1], curr_neuron_features[2])
                         if isinstance(curr_neuron, list):
                             print("list of tuples ", curr_neuron )
                             curr_neuron = curr_neuron[0][1]
@@ -490,7 +509,7 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, cl
 def matching(n_clicks):
     if n_clicks is None:
         raise dash.exceptions.PreventUpdate
-    print("***callback: MATCHING COMPUTED")
+    print("***callback: COMPUTING MATCHING ")
     message = "upload npy_files first"
     if filenames[0]:
         #match_neurons_across_session()
@@ -502,11 +521,12 @@ def matching(n_clicks):
             if idx == 0 or not filename:
                 continue
             #matching_df[filename] = [i for i in range(0, num_neurons_ref)]
-            closest = int_func.match_neurons_to_ref(footprints[0], footprints[idx], coms[0], coms[idx],
+            closest, feature_vals = int_func.match_neurons_to_ref(footprints[0], footprints[idx], coms[0], coms[idx],
                                  templates[0], templates[idx])
             print(type(closest), type(closest[0]), len(closest), len(matching_df))
             matching_df[filename + "ranking"]  = closest
-            matching_df[filename]  = [row[0] for row in closest]
+            matching_df[filename] = [row[0] for row in closest]
+            matching_df[filename + "feature_vals"] = feature_vals
             #print(type([i for i in range(0, num_neurons_ref)]), len([i for i in range(0, num_neurons_ref)]),
             #      type(list(closest[0])), len(list(closest[0])))
 
@@ -514,7 +534,6 @@ def matching(n_clicks):
         matching_df["confirmed"] = 0
         global cell_matching_df; cell_matching_df = matching_df
         message = "matching computed"
-        print(type(cell_matching_df))
         cell_matching_df.to_csv(UPLOAD_DIRECTORY + "result.csv", index = False, header=True, sep=';')
     return message
 
@@ -543,9 +562,27 @@ def uploading_csv(filename):
     elif not all_sessions_in_csv:
         message = "invalid csv (col per session!)"
     elif not has_correct_ref_session:
-        message = "ref sess msut be first col in csv"
+        message = "ref sess must be first col in csv"
     else:
         global cell_matching_df; cell_matching_df = df
+
+        # update coloured templates:
+        global templates;
+        confirmed_neurons_row_idx = list(cell_matching_df.loc[cell_matching_df['confirmed'] == 1][filenames[0]])
+        print("confirmed_neurons_ref", confirmed_neurons_row_idx)
+        for row_idx in confirmed_neurons_row_idx:
+            color = cell_matching_df.at[row_idx, "color"]
+            print("color: ", color)
+            for graph_idx, file in enumerate(filenames):
+                if not file:
+                    continue
+                neuron = cell_matching_df.at[row_idx, file]
+                print(graph_idx)
+                print(type(footprints), type(cols), type(templates[graph_idx]))
+                templates[graph_idx] = np.where(np.logical_and(footprints[graph_idx][neuron] >= 0.01,
+                                                               templates[graph_idx] != 255),  # to keep com dot
+                                                cols[color], templates[graph_idx])
+
         message = filename + " uploaded."
     return message
 
