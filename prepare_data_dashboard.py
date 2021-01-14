@@ -19,15 +19,15 @@ from PIL import Image
 #               USER-SPECIFIC SETTINGS
 # **********************************************************************************************************************
 
-input_folderpaths = ["V:\\Wahl\\Hendrik\\PhD\\Data\\Batch3\\M38\\20200818",
-              "V:\\Wahl\\Hendrik\\PhD\\Data\\Batch3\\M38\\20200819",
-              "V:\\Wahl\\Hendrik\\PhD\\Data\\Batch3\\M38\\20200820"]
-
+input_folderpaths = ["V:\\Wahl\\Hendrik\\PhD\\Data\\Batch3\\M38\\20200818\\",
+              "V:\\Wahl\\Hendrik\\PhD\\Data\\Batch3\\M38\\20200819\\",
+              "V:\\Wahl\\Hendrik\\PhD\\Data\\Batch3\\M38\\20200820\\"]
 
 # ! in same order as the inputfile paths
-output_filepaths =  ["C:\\Users\\annahs\Documents\\Footprints\\alignment_session_data\\20200818",
-                     "C:\\Users\\annahs\Documents\\Footprints\\alignment_session_data\\20200819",
-                     "C:\\Users\\annahs\Documents\\Footprints\\alignment_session_data\\20200820"]
+output_filepaths =  ["C:\\Users\\annahs\Documents\\Footprints\\alignment_session_data\\20200818\\data1.npy",
+                     "C:\\Users\\annahs\Documents\\Footprints\\alignment_session_data\\20200819\\data2.npy",
+                     "C:\\Users\\annahs\Documents\\Footprints\\alignment_session_data\\20200820\\data3.npy"]
+
 
 # use pickle file or h5py file (default False)
 is_pkl_file = False
@@ -38,7 +38,7 @@ def extract_for_manualmatching(input_folderpaths, output_filepaths, isPickleFile
 
 
     for file_idx, filepath in enumerate(input_folderpaths):
-        print("Selected file: ", input_folderpaths + ".npy")
+        print("Selected file: ", filepath + "\cnm_results.npy")
 
         # get tiff image
         print(filepath + "\mean_intensity_image.tif")
@@ -62,17 +62,18 @@ def extract_for_manualmatching(input_folderpaths, output_filepaths, isPickleFile
             print("to load: ", filepath + "\cnm_results.hdf5")
             complete_filepath = filepath + "\cnm_results.hdf5"
             with h5py.File(complete_filepath, "r") as f:
+                print(f["estimates"]["A"]["shape"][()])
                 spatial_mask_mtx = sparse.csc_matrix((f["estimates"]["A"]["data"],
                                                       f["estimates"]["A"]["indices"],
                                                       f["estimates"]["A"]["indptr"]),
-                                                     shape=f["estimates"]["A"]["shape"].value)
+                                                     shape=f["estimates"]["A"]["shape"][()])
                 spatial_mask_mtx.todense()
                 new_data = {
-                    'dff_trace': f["estimates"]["F_dff"].value,
+                    'dff_trace': f["estimates"]["F_dff"][()],
                     'spatial_masks': spatial_mask_mtx,
-                    'template': f["estimates"]["Cn"].value,
+                    'template': f["estimates"]["Cn"][()],
                     'mean_intensity_template': np.array(mean_intensity_image)}
-        np.save(output_filepaths[file_idx] + ".npy", new_data)
+        np.save(output_filepaths[file_idx], new_data)
 
 
 def main():
