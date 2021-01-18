@@ -51,7 +51,7 @@ def extract_for_manualmatching(input_folderpaths, output_filepaths, isPickleFile
             infile = open(complete_filepath, 'rb')
             data_complete = pickle.load(infile)
             print("loaded", complete_filepath)
-            print(data_complete.cnmf.estimates.A.shape)
+            # print(data_complete.cnmf.estimates.A.shape)
             infile.close()
             new_data = {
                 'dff_trace': data_complete.cnmf.estimates.F_dff,

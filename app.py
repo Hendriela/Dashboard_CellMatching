@@ -117,7 +117,7 @@ app.layout = dbc.Container(
 def getdata_from_npyfile(filename, graph_id):
     """ Load the data from the npy file of the session data (obtained by running prepare_data_dashboard.py) """
     print("click", UPLOAD_DIRECTORY + filename)
-    session_data = np.load(UPLOAD_DIRECTORY + filename, allow_pickle=True).item()
+    session_data = np.load(UPLOAD_DIRECTORY + "\\" + filename, allow_pickle=True).item()
     print("loading...", UPLOAD_DIRECTORY + filename)
     templates[graph_id] = session_data['template']
     orig_templates[graph_id] = session_data['template']
@@ -255,8 +255,8 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, cd0, cd1, cd2, cd3, cd4, cd5, cl
                                 
                                     cell_matching_df.at[i, filename] = allowed_ranking[0] if allowed_ranking else 0
                                 """
-                cell_matching_df.to_csv(UPLOAD_DIRECTORY + filename_result_csv , index=False, header=True, sep=';')
-                print("csv saved @ ", UPLOAD_DIRECTORY + filename_result_csv )
+                cell_matching_df.to_csv(UPLOAD_DIRECTORY + "\\" + filename_result_csv , index=False, header=True, sep=';')
+                print("csv saved @ ", UPLOAD_DIRECTORY + "\\" +filename_result_csv )
 
                 # output number of cells left to match
                 num_cells_left = sum(cell_matching_df["confirmed"] == 0)
@@ -418,7 +418,7 @@ def uploading_csv(filename):
     if not filename:
         raise dash.exceptions.PreventUpdate
     print("***callback: MATCHING COMPUTED: ", dash.callback_context.triggered)
-    df = pd.read_csv(UPLOAD_DIRECTORY + filename, sep=';')
+    df = pd.read_csv(UPLOAD_DIRECTORY + "\\" + filename, sep=';')
     # check if column for each uploaded session in csv
     loaded_filenames = [file for file in filenames if file]
     print("loaded filenames: ", loaded_filenames, " df.columns ", df.columns)
