@@ -367,7 +367,7 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, fn6, fn7, fn8, fn9, fn10, fn11,
 
         # 2 GRAPH CLICKED
         elif trigger_action == "clickData":
-            trigger_graph_id = int(trigger_firstarg[-1])
+            trigger_graph_id = int(trigger_firstarg.split("_")[-1])
             print("***callback: IMAGE CLICKED trigger_id: ", trigger_graph_id)
             click_data = cdata[trigger_graph_id]
             print(click_data)
@@ -387,7 +387,10 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, fn6, fn7, fn8, fn9, fn10, fn11,
 
                 # new ref neuron clicked -> update highlighted neuron in ref and non-ref graphs
                 if trigger_graph_id == 0 and not suggestion_mode:
-                    print(list(cell_matching_df.columns), fnames[trigger_graph_id].partition(".")[0])
+                    try:
+                        print(list(cell_matching_df.columns), fnames[trigger_graph_id].partition(".")[0])
+                    except AttributeError:
+                        print("Compute or upload matchings before clicking neurons!")
                     col = cell_matching_df[fnames[trigger_graph_id].partition(".")[0]]
                     row_idx = cell_matching_df[col == neuron_id].index.values[0]
                     print("row index is: ", row_idx)

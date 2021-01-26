@@ -127,7 +127,7 @@ select_controls = dbc.Card(
             ]),
         dbc.FormGroup(
             [
-                dbc.Label("5. Indicate if neuron does not exsit"),
+                dbc.Label("5. Indicate if neuron does not exist"),
                 dbc.Row(
                     [html.Div([
                         dbc.Button("No match 1", id="no_match_1", size="sm", style={"visibility": "hidden"},
