@@ -51,6 +51,7 @@ templates = [None] * num_plots_max
 templates_tiff = [None] * num_plots_max
 coms = [None] * num_plots_max
 current_selected = [-1] * num_plots_max
+no_match = [False] * (num_plots_max - 1)
 pixel_ownerships = [np.full((512, 512), -1)] * num_plots_max
 empty_template = [[0] * 512] * 512
 figs = [int_func.format_fig(empty_template)] * num_plots_max
@@ -217,7 +218,8 @@ def get_predicted_neuron(clf, clf_input):
                Output('graph_9', 'figure'),
                Output('graph_10', 'figure'),
                Output('graph_11', 'figure'),
-               Output('num_left_to_match', 'children')
+               Output('num_left_to_match', 'children'),
+                Output('reset_match_buttons', 'children')
                ],
               [Input('upload_session_0', 'filename'),
                Input('upload_session_1', 'filename'),
@@ -245,7 +247,8 @@ def get_predicted_neuron(clf, clf_input):
                Input('graph_11', 'clickData'),
                Input('save_button', 'n_clicks'),
                Input('suggestion_mode_button', 'active'),
-               Input('tiff_mode_button', 'active')],
+               Input('tiff_mode_button', 'active'),
+               Input('no_match_update_graph', 'children')],
               [State('graph_0', 'figure'),
                State('graph_1', 'figure'),
                State('graph_2', 'figure'),
@@ -262,7 +265,7 @@ def get_predicted_neuron(clf, clf_input):
               prevent_initial_call=True)
 def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, fn6, fn7, fn8, fn9, fn10, fn11,
                   cd0, cd1, cd2, cd3, cd4, cd5, cd6, cd7, cd8, cd9, cd10, cd11,
-                  click_save, suggestion_mode, tiff_mode,
+                  click_save, suggestion_mode, tiff_mode, no_match_update,
                   st0, st1, st2, st3, st4, st5, st6, st7, st8, st9, st10, st11,
                   state_cells_left):
     fnames = [fn0, fn1, fn2, fn3, fn4, fn5, fn6, fn7, fn8, fn9, fn10, fn11]
@@ -272,6 +275,7 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, fn6, fn7, fn8, fn9, fn10, fn11,
     new_sugg = False
     cells_left_message = state_cells_left
     ctx = dash.callback_context
+    reset = no_update
     global cell_matching_df
     global templates
     global orig_templates
@@ -294,20 +298,6 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, fn6, fn7, fn8, fn9, fn10, fn11,
                 for graph_idx, filename in enumerate(filenames):
                     if filename:
                         cell_matching_df.at[row_idx, filename] = current_selected[graph_idx]
-                        if graph_idx:  # not ref graph
-                            confirmed_neurons = list(cell_matching_df.loc[cell_matching_df['confirmed'] == 1][filename])
-                            print("confirmed_neurons: ", confirmed_neurons)
-                            """
-                            for i in cell_matching_df.index:
-                                print(type(json.loads(cell_matching_df.at[i, filename + "ranking"])))
-
-                                if cell_matching_df.at[i, "confirmed"] == 0:
-                                    allowed_ranking = [neuron for neuron in
-                                                       json.loads(cell_matching_df.at[i, filename + "ranking"])
-                                                       if neuron not in confirmed_neurons]
-
-                                    cell_matching_df.at[i, filename] = allowed_ranking[0] if allowed_ranking else 0
-                                """
                 cell_matching_df.to_csv(UPLOAD_DIRECTORY + "\\" + filename_result_csv, index=False, header=True, sep=';')
                 print("csv saved @ ", UPLOAD_DIRECTORY + "\\" + filename_result_csv)
 
@@ -328,6 +318,7 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, fn6, fn7, fn8, fn9, fn10, fn11,
                     updates[graph_idx] = update_graph(tiff_mode, filename, graph_idx, -1)
                 print(cells_left_message)
                 new_sugg = suggestion_mode
+                reset = True
 
         # SUGGEST RANDOM NEURON MATCHING
         if (ctx.triggered[0]['prop_id'] == "suggestion_mode_button.active") or new_sugg:
@@ -364,10 +355,18 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, fn6, fn7, fn8, fn9, fn10, fn11,
                 print(filename, fnames, current_selected[graph_idx])
                 updates[graph_idx] = update_graph(tiff_mode, filename, graph_idx, current_selected[graph_idx])
 
+        #  NO MATCH BUTTON UPDATED
+        elif ctx.triggered[0]['prop_id'] == "no_match_update_graph.children":
+            print("***callback: GRAPH UPDATED because of NO MATCH BUTTON click: ")
+            for graph_idx, filename in enumerate(fnames):
+                if not filename or not graph_idx: # not ref
+                    continue
+                current_selected[graph_idx] = -1 if no_match[graph_idx - 1] else current_selected[graph_idx]
+                updates[graph_idx] = update_graph(tiff_mode, filename, graph_idx, current_selected[graph_idx])
 
         # 2 GRAPH CLICKED
         elif trigger_action == "clickData":
-            trigger_graph_id = int(trigger_firstarg.split("_")[-1])
+            trigger_graph_id = int(trigger_firstarg.rsplit('_', 1)[-1])
             print("***callback: IMAGE CLICKED trigger_id: ", trigger_graph_id)
             click_data = cdata[trigger_graph_id]
             print(click_data)
@@ -381,9 +380,10 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, fn6, fn7, fn8, fn9, fn10, fn11,
 
                 # reselection of matching -> update highlighted neuron (of a non-reference graph)
                 if trigger_graph_id != 0:
-                    print("newly selected: ", current_selected[trigger_graph_id])
-                    updates[trigger_graph_id] = update_graph(tiff_mode, fnames[trigger_graph_id], trigger_graph_id,
-                                                             current_selected[trigger_graph_id])
+                    if not no_match[trigger_graph_id-1]:  # cannot update graph if 'no match' button is pressed!
+                        print("newly selected: ", current_selected[trigger_graph_id])
+                        updates[trigger_graph_id] = update_graph(tiff_mode, fnames[trigger_graph_id], trigger_graph_id,
+                                                                 current_selected[trigger_graph_id])
 
                 # new ref neuron clicked -> update highlighted neuron in ref and non-ref graphs
                 if trigger_graph_id == 0 and not suggestion_mode:
@@ -427,7 +427,7 @@ def update_graphs(fn0, fn1, fn2, fn3, fn4, fn5, fn6, fn7, fn8, fn9, fn10, fn11,
         else:
             pass
     print(cells_left_message)
-    return tuple(updates) + (cells_left_message,)
+    return tuple(updates) + (cells_left_message,) + (reset,)
 
 
 @app.callback(
@@ -567,37 +567,50 @@ def update_image_mode(c_basic, c_tiff, state_basic, state_tiff):
     [Output('no_match_2', 'active'), Output('no_match_3', 'active'), Output('no_match_4', 'active'),
      Output('no_match_5', 'active'), Output('no_match_6', 'active'),
      Output('no_match_7', 'active'), Output('no_match_8', 'active'), Output('no_match_9', 'active'),
-     Output('no_match_10', 'active'), Output('no_match_11', 'active'), Output('no_match_12', 'active')],
+     Output('no_match_10', 'active'), Output('no_match_11', 'active'), Output('no_match_12', 'active'),
+     Output('no_match_update_graph', 'children')],
     [Input('no_match_2', 'n_clicks'), Input('no_match_3', 'n_clicks'), Input('no_match_4', 'n_clicks'),
      Input('no_match_5', 'n_clicks'), Input('no_match_6', 'n_clicks'),
      Input('no_match_7', 'n_clicks'), Input('no_match_8', 'n_clicks'), Input('no_match_9', 'n_clicks'),
-     Input('no_match_10', 'n_clicks'), Input('no_match_11', 'n_clicks'),  Input('no_match_12', 'n_clicks')],
+     Input('no_match_10', 'n_clicks'), Input('no_match_11', 'n_clicks'),  Input('no_match_12', 'n_clicks'),
+     Input('reset_match_buttons', 'children')],
     [State('no_match_2', 'active'), State('no_match_3', 'active'),
      State('no_match_4', 'active'), State('no_match_5', 'active'), State('no_match_6', 'active'),
      State('no_match_7', 'active'), State('no_match_8', 'active'), State('no_match_9', 'active'),
      State('no_match_10', 'active'), State('no_match_11', 'active'), State('no_match_12', 'active')],
     prevent_initial_call=True)
 def update_no_match_buttons(click2, click3, click4, click5, click6,
-                            click7, click8, click9, click10, click11, click12,
+                            click7, click8, click9, click10, click11, click12, reset,
                             state2, state3, state4, state5, state6,
                             state7, state8, state9, state10, state11, state12):
     clicks = [click2, click3, click4, click5, click6, click7, click8, click9, click10, click11, click12]
-    if all(click is None for click in clicks):
-        raise dash.exceptions.PreventUpdate
     print("***callback: UPDATE MATCH BUTTONS: ", dash.callback_context.triggered)
     states = [state2, state3, state4, state5, state6, state7, state8, state9, state10, state11, state12]
+    print("before: ", states)
     ctx = dash.callback_context
-    if ctx.triggered:
-        print(ctx.triggered[0]["prop_id"].split(".")[0].rsplit('_', 1)[-1])
-        triggered_id = int(ctx.triggered[0]["prop_id"].split(".")[0].rsplit('_', 1)[-1])
+    need_to_update_graph = no_update
+    if ctx.triggered and ctx.triggered[0]["prop_id"] == 'reset_match_buttons.children':
+        print("reset no match buttons")
+        states = [False] * (num_plots_max - 1)
+    elif all(click is None for click in clicks):
+        raise dash.exceptions.PreventUpdate
+    elif ctx.triggered:
+        need_to_update_graph = True
+        print(ctx.triggered[0]["prop_id"].rsplit('_', 1)[-1])
+        trigger_firstarg = ctx.triggered[0]['prop_id'].split('.')[0]
+        triggered_id = int(trigger_firstarg.rsplit('_', 1)[-1])
         print(states[triggered_id - 2])
         states[triggered_id - 2] = not states[triggered_id - 2]
-        global current_selected;
+        global current_selected
         current_selected[triggered_id - 1] = -1
         print(current_selected)
-    return states
+    print("after: ", states)
+    global no_match
+    no_match = states
+    return tuple(states) + (need_to_update_graph,)
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True, threaded=True)
+    app.config.suppress_callback_exceptions = True
+    app.run_server(debug=True, dev_tools_ui=False, threaded=True)
     # app.run_server(debug=False)

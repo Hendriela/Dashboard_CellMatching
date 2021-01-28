@@ -129,7 +129,8 @@ select_controls = dbc.Card(
             [
                 dbc.Label("5. Indicate if neuron does not exist"),
                 dbc.Row(
-                    [html.Div([
+                    [
+                     html.Div([
                         dbc.Button("No match 1", id="no_match_1", size="sm", style={"visibility": "hidden"},
                                    outline=True, color="secondary"),
                         dbc.Button("No match 2", id="no_match_2", size="sm", outline=True, color="secondary",
@@ -150,6 +151,8 @@ select_controls = dbc.Card(
                     ])
                     ]
                 ),
+                html.Div(False, id='reset_match_buttons', style={'display': 'none'}),
+                html.Div(False, id='no_match_update_graph', style={'display': 'none'}),
             ]),
         dbc.FormGroup([
             dbc.Label("6. Click save after each matched neuron"),
@@ -413,6 +416,8 @@ select_controls_16sessions =     [
                     ])
                     ]
                 ),
+                html.Div(False, id='reset_match_buttons', style={'display': 'none'}),
+                html.Div(False, id='no_match_update_graph', style={'display': 'none'}),
             ]),
         dbc.FormGroup([
             dbc.Label("6. Click save after each matched neuron"),
@@ -630,6 +635,8 @@ select_controls_12sessions =     [
                     ])
                     ]
                 ),
+                html.Div(False, id='reset_match_buttons', style={'display': 'none'}),
+                html.Div(False, id='no_match_update_graph', style={'display': 'none'}),
             ]),
         dbc.FormGroup([
             dbc.Label("6. Click save after each matched neuron"),
