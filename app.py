@@ -16,7 +16,7 @@ from content_layout import select_controls, controls
 # **********************************************************************************************************************
 
 # UPLOAD_DIRECTORY = "W:\\Neurophysiology-Storage1\\Wahl\\Anna\\"
-UPLOAD_DIRECTORY = "/home/anna/Documents/Neuron_imaging_validationsets/"
+UPLOAD_DIRECTORY = r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\batch_processing\cell_alignments\footprints\M38"
 filename_result_csv = 'result_matching.csv'
 
 # True -> if the classifier predicts "no neuron", the closest neuron is shown

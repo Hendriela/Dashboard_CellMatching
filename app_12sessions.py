@@ -16,7 +16,7 @@ from content_layout import select_controls_12sessions, controls_12sessions
 # **********************************************************************************************************************
 
 # UPLOAD_DIRECTORY = "W:\\Neurophysiology-Storage1\\Wahl\\Anna\\"
-UPLOAD_DIRECTORY = "/home/anna/Documents/Neuron_imaging_validationsets/"
+UPLOAD_DIRECTORY = r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\batch_processing\cell_alignments\footprints\M38"
 filename_result_csv = 'result_matching.csv'
 
 # True -> if the classifier predicts "no neuron", the closest neuron is shown
@@ -612,5 +612,6 @@ def update_no_match_buttons(click2, click3, click4, click5, click6,
 
 if __name__ == '__main__':
     app.config.suppress_callback_exceptions = True
-    app.run_server(debug=True, dev_tools_ui=False, threaded=True)
+    app.run_server(debug=True)
+    # app.run_server(debug=True, dev_tools_ui=False, threaded=True)
     # app.run_server(debug=False)

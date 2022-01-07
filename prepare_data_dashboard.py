@@ -19,15 +19,33 @@ from PIL import Image
 #               USER-SPECIFIC SETTINGS
 # **********************************************************************************************************************
 
-input_folderpaths = ["V:\\Wahl\\Hendrik\\PhD\\Data\\Batch3\\M38\\20200818\\",
-              "V:\\Wahl\\Hendrik\\PhD\\Data\\Batch3\\M38\\20200819\\",
-              "V:\\Wahl\\Hendrik\\PhD\\Data\\Batch3\\M38\\20200820\\"]
+input_folderpaths = [r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\M38\20200818",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\M38\20200819",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\M38\20200820",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\M38\20200821",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\M38\20200824",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\M38\20200826",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\M38\20200827",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\M38\20200830",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\M38\20200902",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\M38\20200905",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\M38\20200908",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\M38\20200911"]
+
 
 # ! in same order as the inputfile paths
-output_filepaths =  ["C:\\Users\\annahs\Documents\\Footprints\\alignment_session_data\\20200818\\data1.npy",
-                     "C:\\Users\\annahs\Documents\\Footprints\\alignment_session_data\\20200819\\data2.npy",
-                     "C:\\Users\\annahs\Documents\\Footprints\\alignment_session_data\\20200820\\data3.npy"]
-
+output_filepaths =  [r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\batch_processing\cell_alignments\footprints\M38\20200818",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\batch_processing\cell_alignments\footprints\M38\20200819",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\batch_processing\cell_alignments\footprints\M38\20200820",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\batch_processing\cell_alignments\footprints\M38\20200821",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\batch_processing\cell_alignments\footprints\M38\20200824",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\batch_processing\cell_alignments\footprints\M38\20200826",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\batch_processing\cell_alignments\footprints\M38\20200827",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\batch_processing\cell_alignments\footprints\M38\20200830",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\batch_processing\cell_alignments\footprints\M38\20200902",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\batch_processing\cell_alignments\footprints\M38\20200905",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\batch_processing\cell_alignments\footprints\M38\20200908",
+                     r"W:\Neurophysiology-Storage1\Wahl\Hendrik\PhD\Data\Batch3\batch_processing\cell_alignments\footprints\M38\20200911"]
 
 # use pickle file or h5py file (default False)
 is_pkl_file = False
